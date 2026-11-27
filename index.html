@@ -1,12 +1,20 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="auto">
+<html lang="en-GB" data-theme="auto">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="Interactive world map with population, GDP, HDI, CO₂, life expectancy and internet data for 172 countries.">
+<meta name="author" content="Shaz Moghaddam">
+<meta name="theme-color" content="#f0f2f5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d1b2a" media="(prefers-color-scheme: dark)">
 <meta property="og:title" content="World Map">
-<meta property="og:description" content="Interactive world map — explore country data, compare regions and filter by group.">
+<meta property="og:description" content="Interactive world map: explore six data layers for 172 countries, filter by region or group, and import your own data.">
 <meta property="og:type" content="website">
+<meta property="og:url" content="https://shazmoghaddam.github.io/world-map/">
+<meta property="og:image" content="https://shazmoghaddam.github.io/world-map/assets/social-preview.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>">
 <title>World Map</title>
 <style>
@@ -143,13 +151,16 @@ body{background:var(--bg);font-family:-apple-system,"Segoe UI",system-ui,sans-se
 .land{fill:var(--land);stroke:var(--border);stroke-width:.5;stroke-linejoin:round;
   cursor:pointer;transition:fill .18s ease}
 .land:hover{fill:var(--land-h)}
-.land.sel{fill:var(--land-sel)!important;stroke:rgba(58,124,165,.85);stroke-width:1.5;
+.land.sel{stroke:rgba(58,124,165,.85);stroke-width:1.5;
   filter:drop-shadow(0 0 6px rgba(58,124,165,.4))}
+#lands:not(.has-layer) .land.sel{fill:var(--land-sel)!important}
 .land.dim{opacity:.25}
 .land.hi{fill:var(--land-h)}
 .land.disputed{fill:var(--disp-fill)!important;stroke:var(--disp-stroke);stroke-dasharray:5 3}
 .land.disputed:hover,.land.disputed.sel{stroke-dasharray:none}
-.land.disputed.sel{fill:var(--land-sel)!important}
+#lands:not(.has-layer) .land.disputed.sel{fill:var(--land-sel)!important}
+/* With a data layer on, the country keeps its own data colour and gets a strong outline */
+#lands.has-layer .land.sel{stroke:var(--txt);stroke-width:2;filter:drop-shadow(0 0 5px rgba(0,0,0,.35))}
 .grat{stroke:var(--grat);stroke-width:.4;fill:none}
 
 /* Labels */
@@ -304,8 +315,8 @@ body{background:var(--bg);font-family:-apple-system,"Segoe UI",system-ui,sans-se
 .leg-unit{font-size:10px;color:var(--muted);font-style:italic;white-space:nowrap}
 .leg-bar-wrap{grid-area:bar;position:relative}
 .leg-bar{height:12px;border-radius:6px;width:100%;box-shadow:inset 0 1px 2px rgba(0,0,0,.08)}
-.leg-ticks{grid-area:ticks;display:flex;justify-content:space-between}
-.leg-tick{font-size:9px;color:var(--muted);font-weight:500}
+.leg-ticks{grid-area:ticks;position:relative;height:14px}
+.leg-tick{position:absolute;top:0;font-size:9px;color:var(--muted);font-weight:500;white-space:nowrap}
 .leg-marker{position:absolute;top:-5px;width:2px;height:22px;background:var(--txt);
   border-radius:1px;transform:translateX(-50%);pointer-events:none;transition:left .3s}
 @keyframes valFlash{from{opacity:.15}to{opacity:1}}
@@ -494,10 +505,23 @@ html.theme-change .nav-btn{
   #mm{display:none}
   #info{width:calc(100% - 24px);max-width:300px}
   .legend{max-width:100%}
+  /* A taller frame on phones; the map fills it and you pan to the edges */
+  .mo{height:min(62vh,100vw);height:min(62svh,100vw)}
+  #wm{height:100%}
+  /* The country panel sits below the map instead of covering it */
+  #info.docked{position:relative;top:auto;right:auto;left:auto;width:100%;
+    max-width:none;max-height:none;border-radius:14px;
+    box-shadow:0 2px 10px var(--shad2)}
+  /* Legend stacks: title and value on top, a full-width bar and ticks below */
+  .legend{padding:14px 16px;grid-template-columns:1fr auto;
+    grid-template-areas:"head val" "bar bar" "ticks ticks";row-gap:8px;column-gap:12px}
+  .leg-head{border-right:none;padding-right:0;min-width:0}
+  .leg-title{white-space:normal}
+  .leg-tick{font-size:10px}
 }
 @media(max-width:480px){
   .toolbar{gap:5px}
-  #info{width:calc(100% - 16px);right:8px;top:8px;max-width:none}
+  #info:not(.docked){width:calc(100% - 16px);right:8px;top:8px;max-width:none}
   .theme-grp .tb{padding:3px 8px;font-size:10px}  /* compact not hidden */
   .site-footer{gap:6px}
   .footer-row{gap:5px 8px}
@@ -567,10 +591,10 @@ html.theme-change .nav-btn{
   <!-- Map -->
   <div class="mo" id="mo">
     <svg id="wm" viewBox="0 0 1200 620" xmlns="http://www.w3.org/2000/svg"
-         role="img" aria-label="Interactive world map">
+         preserveAspectRatio="xMidYMid slice" role="img" aria-label="Interactive world map">
       <rect width="1200" height="620" fill="var(--ocean)"/>
     </svg>
-    <div id="ll"><svg id="ls" viewBox="0 0 1200 620"></svg></div>
+    <div id="ll"><svg id="ls" viewBox="0 0 1200 620" preserveAspectRatio="xMidYMid slice"></svg></div>
 
     <div id="filter-badge" class="filter-active-badge"></div>
 
@@ -887,7 +911,19 @@ function updateVisuals() {
 updateVisuals();
 
 /* == Choropleth engine (Seg 3) ============================================= */
-function hexRgb(h){const n=parseInt(h.replace('#',''),16);return[(n>>16)&255,(n>>8)&255,n&255];}
+/* Parse '#rgb', '#rrggbb' or 'rgb(r,g,b)'. The fill animation feeds its own
+   rgb() output back in as the next start colour, so both forms must work
+   (hex-only parsing returned NaN, which browsers paint as black). */
+function hexRgb(c){
+  c=String(c||'').trim();
+  const m=c.match(/^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/i);
+  if(m) return [+m[1],+m[2],+m[3]];
+  let h=c.replace('#','');
+  if(h.length===3) h=h.split('').map(x=>x+x).join('');
+  const n=parseInt(h,16);
+  if(isNaN(n)) return [192,200,208];           /* NO_DATA_COLOR, never black */
+  return[(n>>16)&255,(n>>8)&255,n&255];
+}
 function lerpColor(a,b,t){
   const[ar,ag,ab]=hexRgb(a),[br,bg,bb]=hexRgb(b);
   return`rgb(${(ar+(br-ar)*t)|0},${(ag+(bg-ag)*t)|0},${(ab+(bb-ab)*t)|0})`;
@@ -912,28 +948,28 @@ const MODES={
     stops:['#f7fbff','#c6dbef','#6baed6','#2171b5','#084594'],
     lo:0.1,hi:800,norm:normLog,get:c=>c.dens,
     fmt:v=>v<10?v.toFixed(1)+' /km\u00b2':Math.round(v).toLocaleString()+' /km\u00b2',
-    ticks:['0','10','100','800+']},
+    ticks:['0','10','100','800+'],tickVals:[0.1,10,100,800]},
   gdppc:{label:'GDP per Capita',unit:'USD (est.)',
     stops:['#f7fcf5','#c7e9c0','#74c476','#238b45','#00441b'],
     lo:200,hi:80000,norm:normLog,get:c=>c.gdppc,
     fmt:v=>'$'+Math.round(v).toLocaleString(),
-    ticks:['<$1k','$5k','$20k','$80k+']},
+    ticks:['$1k','$5k','$20k','$80k+'],tickVals:[1000,5000,20000,80000]},
   hdi:{label:'Human Development Index',unit:'HDI 2022',
     stops:['#d73027','#fc8d59','#fee090','#91cf60','#1a9850'],
     lo:0.3,hi:1.0,norm:normLin,get:c=>c.hdi,
-    fmt:v=>v.toFixed(3),ticks:['0.3','0.55','0.75','1.0']},
+    fmt:v=>v.toFixed(3),ticks:['0.3','0.55','0.75','1.0'],tickVals:[0.3,0.55,0.75,1.0]},
   co2:{label:'CO\u2082 Emissions',unit:'tonnes / person / yr',
     stops:['#ffffcc','#a1dab4','#41b6c4','#2c7fb8','#253494'],
     lo:0.05,hi:25,norm:normLog,get:c=>c.co2,
-    fmt:v=>v.toFixed(1)+'t',ticks:['0','2','8','25+']},
+    fmt:v=>v.toFixed(1)+'t',ticks:['0','2','8','25+'],tickVals:[0.05,2,8,25]},
   lifeexp:{label:'Life Expectancy',unit:'years (WHO est.)',
     stops:['#fde0dd','#fbb4b9','#f768a1','#c51b8a','#7a0177'],
     lo:50,hi:85,norm:normLin,get:c=>LIFEEXP[c.i3]??null,
-    fmt:v=>v.toFixed(0)+' yrs',ticks:['50','60','70','85']},
+    fmt:v=>v.toFixed(0)+' yrs',ticks:['50','60','70','85'],tickVals:[50,60,70,85]},
   internet:{label:'Internet Penetration',unit:'% population online',
     stops:['#fff7bc','#fec44f','#fe9929','#d95f0e','#993404'],
     lo:0,hi:100,norm:normLin,get:c=>INTERNET[c.i3]??null,
-    fmt:v=>v.toFixed(0)+'%',ticks:['0%','25%','50%','75%','100%']},
+    fmt:v=>v.toFixed(0)+'%',ticks:['0%','25%','50%','75%','100%'],tickVals:[0,25,50,75,100]},
 };
 
 /* == Life expectancy + Internet % data ==================================== */
@@ -955,6 +991,8 @@ function animateFills(targetFills,duration=500){
   if(animRaf){cancelAnimationFrame(animRaf);animRaf=null;}
   const startFills={},landClr=getLandColor();
   DATA.forEach(c=>{startFills[c.i3]=curFills[c.i3]||landClr;});
+  /* While a data layer is on, a selected country keeps its data colour */
+  landG.classList.toggle('has-layer',Object.values(targetFills).some(Boolean));
   landG.classList.add('land-animating');
   const t0=performance.now();
   function step(now){
@@ -986,7 +1024,14 @@ function updateLegend(modeKey){
   document.getElementById('leg-unit').textContent=m.unit;
   document.getElementById('leg-bar').style.background=gradientCSS(m.stops);
   const tEl=document.getElementById('leg-ticks'); tEl.innerHTML='';
-  m.ticks.forEach(t=>{const s=document.createElement('span');s.className='leg-tick';s.textContent=t;tEl.appendChild(s);});
+  /* Each tick sits where its value really falls on the (linear or log) scale */
+  m.ticks.forEach((t,i)=>{
+    const s=document.createElement('span');s.className='leg-tick';s.textContent=t;
+    const pos=m.tickVals?m.norm(m.tickVals[i],m.lo,m.hi):i/(m.ticks.length-1);
+    s.style.left=(pos*100).toFixed(1)+'%';
+    s.style.transform=pos<=0.02?'none':pos>=0.98?'translateX(-100%)':'translateX(-50%)';
+    tEl.appendChild(s);
+  });
   updateLegendMarker();
 }
 function updateLegendMarker(){
@@ -1228,10 +1273,39 @@ document.getElementById('mm').addEventListener('click',e=>{
 
 /* == Events ================================================================ */
 const mo=document.getElementById('mo');
+
+/* Screen pixels -> map units (the 1200 x 620 viewBox), using the SVG's own
+   matrix so it stays right whatever shape the map frame is (phones crop it). */
+function toMap(clientX,clientY){
+  const m=wm.getScreenCTM();
+  if(!m){ const r=wm.getBoundingClientRect(); return [(clientX-r.left)*W/r.width,(clientY-r.top)*H/r.height]; }
+  const p=new DOMPoint(clientX,clientY).matrixTransform(m.inverse());
+  return [p.x,p.y];
+}
+function mapUnitsPerPx(){
+  const m=wm.getScreenCTM();
+  return m ? 1/m.a : W/wm.getBoundingClientRect().width;
+}
+
+/* Phones: move the country panel out from over the map to just below it */
+const infoEl=document.getElementById('info');
+const phoneMQ=window.matchMedia('(max-width:720px)');
+function placeInfo(){
+  if(phoneMQ.matches){ if(!infoEl.classList.contains('docked')){ mo.after(infoEl); infoEl.classList.add('docked'); } }
+  else if(infoEl.classList.contains('docked')){ infoEl.classList.remove('docked'); mo.appendChild(infoEl); }
+}
+placeInfo();
+phoneMQ.addEventListener('change',placeInfo);
+/* Bring the docked panel into view when a country is picked */
+function revealInfo(){
+  if(!infoEl.classList.contains('docked')) return;
+  const r=infoEl.getBoundingClientRect();
+  if(r.top>innerHeight-80) infoEl.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth',block:'start'});
+}
 mo.addEventListener('wheel',e=>{
   e.preventDefault();
-  const r=wm.getBoundingClientRect(),s=W/r.width;
-  zoom(e.deltaY<0?1.18:1/1.18,(e.clientX-r.left)*s,(e.clientY-r.top)*s);
+  const [x,y]=toMap(e.clientX,e.clientY);
+  zoom(e.deltaY<0?1.18:1/1.18,x,y);
 },{passive:false});
 
 let drag=false,dragX=0,dragY=0,moved=false;
@@ -1244,7 +1318,7 @@ mo.addEventListener('pointermove',e=>{
   if(!drag) return;
   const dx=e.clientX-dragX,dy=e.clientY-dragY;
   if(Math.abs(dx)+Math.abs(dy)>3) moved=true;
-  const s=W/wm.getBoundingClientRect().width;
+  const s=mapUnitsPerPx();
   vx+=dx*s; vy+=dy*s; dragX=e.clientX; dragY=e.clientY; scheduleRender();
 });
 mo.addEventListener('pointerup',()=>{ drag=false; });
@@ -1256,10 +1330,9 @@ mo.addEventListener('touchmove',e=>{
   const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,
                      e.touches[0].clientY-e.touches[1].clientY);
   if(pinchD){
-    const r=wm.getBoundingClientRect();
-    zoom(d/pinchD,
-      ((e.touches[0].clientX+e.touches[1].clientX)/2-r.left)*(W/r.width),
-      ((e.touches[0].clientY+e.touches[1].clientY)/2-r.top)*(H/r.height));
+    const [x,y]=toMap((e.touches[0].clientX+e.touches[1].clientX)/2,
+                      (e.touches[0].clientY+e.touches[1].clientY)/2);
+    zoom(d/pinchD,x,y);
   }
   pinchD=d;
 },{passive:false});
@@ -1497,6 +1570,7 @@ function selectCountry(iso, noHistory=false){
   if(dispEl) dispEl.style.display=DISPUTED.has(iso)?'inline':'none';
 
   document.getElementById('info').classList.add('vis');
+  if(!noHistory) requestAnimationFrame(revealInfo);
   updateLegendMarker(); updateCounter();
   if(!noHistory) updateURL(iso);
   postOut({type:'countrySelected',iso,name:c.n,data:{iso2:c.i,cont:c.co,cap:c.cap,tz:c.tz,pop:c.p,gdp:c.g}});
@@ -1700,6 +1774,8 @@ function postOut(msg) {
 }
 
 window.addEventListener('message', e => {
+  /* Only the page this map is embedded in may control it */
+  if (window.parent === window || e.source !== window.parent) return;
   const d = e.data || {};
   switch(d.type) {
     case 'select':      WorldMap.flyTo(d.iso); WorldMap.select(d.iso); break;
@@ -1823,9 +1899,12 @@ function parseAndApply(text, filename) {
     'Range: '+minVal.toFixed(2)+' \u2013 '+maxVal.toFixed(2);
   document.getElementById('leg-bar').style.background = gradientCSS(['#c6dbef','#084594']);
   const tEl = document.getElementById('leg-ticks'); tEl.innerHTML = '';
-  [minVal, (minVal+maxVal)/2, maxVal].forEach(v=>{
+  [minVal, (minVal+maxVal)/2, maxVal].forEach((v,i)=>{
     const s=document.createElement('span'); s.className='leg-tick';
-    s.textContent=v.toFixed(2); tEl.appendChild(s);
+    s.textContent=v.toFixed(2);
+    s.style.left=(i*50)+'%';
+    s.style.transform=i===0?'none':i===2?'translateX(-100%)':'translateX(-50%)';
+    tEl.appendChild(s);
   });
   document.getElementById('leg-val').textContent='';
   document.getElementById('legend').classList.add('vis');
